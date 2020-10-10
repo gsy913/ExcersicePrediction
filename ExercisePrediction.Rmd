@@ -1,0 +1,89 @@
+---
+title: "Exercise Prediction"
+author: "Siyi Gu"
+date: "10/7/2020"
+output: html_document
+---
+
+## Introduction
+This is a prediction assignment for the Coursera practical machine learning course project. The goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants,  whom were asked to perform barbell lifts correctly and incorrectly in 5 different ways, and to predict the manner in which they did the exercise. The analysis will build different models from the training data set and assess their performance; one model will be selected in the end as the best.
+
+## Getting and cleaning the data
+- Load the data sets and necessary libraries:
+```{r}
+library(caret)
+library(randomForest)
+library(gbm)
+library(ggplot2)
+library(dplyr)
+
+training<-read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+testing<-read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+dim(training)
+dim(testing)
+```
+- Remove some variables that have NA values and near zero values in them:
+```{r}
+training<-training[,colSums(is.na(training))==0]
+NZV<-nearZeroVar(training)
+training<-training[,-NZV]
+```
+- The first few columns are time and user information which is not likely to affect prediction, remove these columns:
+```{r}
+training<-training[,-c(1:6)]
+dim(training)
+```
+- The final training data set has 53 variables left, split the training data set further into training and cross validation set:
+```{r}
+set.seed(345)
+inTrain<-createDataPartition(training$classe,p=0.7,list=F)
+tr<-training[inTrain,]
+cv<-training[-inTrain,]
+```
+
+## Building models
+- Build model with trees:    
+```{r cache=TRUE}
+set.seed(345)
+modtr<-train(classe~.,data=tr,method="rpart")
+print(modtr)
+library(rattle)
+fancyRpartPlot(modtr$finalModel)
+```
+  
+- Build model with random forest:
+```{r cache=TRUE}
+set.seed(345)
+modrf<-train(classe~.,method="rf",data=tr)
+print(modrf)
+```
+- Build model with boosting:
+```{r cache=TRUE}
+set.seed(345)
+modgbm<-train(classe~.,data=tr, method="gbm",verbose=FALSE)
+print(modgbm)
+```
+- Based on the in-sample accuracy the random forest model works the best. 
+
+## Testing
+- Testing all three models with the cross validation test set, first with decision tree:
+```{r cache=TRUE}
+cv$classe<-factor(cv$classe)
+confusionMatrix(predict(modtr,cv),cv$classe)
+```
+- With random forest:
+```{r}
+confusionMatrix(predict(modrf,cv),cv$classe)
+```
+- With boosting:
+```{r}
+confusionMatrix(predict(modgbm,cv),cv$classe)
+```
+- Based on the out-of-sample error rate, the random forest model works the best. 
+
+## Conclusions
+- Based on the performance of the models, the final model selected is the random forest model. The prediction for the test set is as follows:
+```{r cache=TRUE}
+predict(modrf,testing)
+```
+
